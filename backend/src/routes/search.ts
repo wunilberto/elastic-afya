@@ -109,7 +109,6 @@ searchRouter.get("/", async (req, res) => {
   const hits = esResponse.hits.hits.map((h: any) => ({ id: h._id, index: h._index, score: h._score, ...h._source, highlight: h.highlight }));
   const total = typeof esResponse.hits.total === "object" ? esResponse.hits.total.value : esResponse.hits.total;
   const query_id = randomUUID();
-  // async log search analytics
   try {
     await esClient.index({ index: "analiticos-buscas", document: { id_consulta: query_id, termo: q, total, carimbo_tempo: Date.now() }, refresh: "false" });
   } catch {

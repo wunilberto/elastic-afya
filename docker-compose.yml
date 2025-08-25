@@ -1,0 +1,119 @@
+version: '3.8'
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.1
+    container_name: elasticsearch
+    environment:
+      - node.name=es01
+      - cluster.name=docker-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - xpack.security.enabled=true
+      - xpack.security.authc.api_key.enabled=true
+      - ELASTIC_PASSWORD=changeme
+      - ES_JAVA_OPTS=-Xms2g -Xmx2g
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    ports:
+      - 9200:9200
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -u elastic:${ELASTIC_PASSWORD:-changeme} http://localhost:9200 >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 30s
+    networks:
+      - elastic
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.12.1
+    container_name: kibana
+    depends_on:
+      - elasticsearch
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=kibana_system
+      - ELASTICSEARCH_PASSWORD=changeme
+    ports:
+      - 5601:5601
+    networks:
+      - elastic
+
+  apm-server:
+    image: docker.elastic.co/apm/apm-server:8.12.1
+    container_name: apm-server
+    depends_on:
+      - elasticsearch
+      - kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=elastic
+      - ELASTICSEARCH_PASSWORD=changeme
+      - KIBANA_HOST=http://kibana:5601
+      - output.elasticsearch.enabled=true
+      - apm-server.auth.api_key.enabled=true
+    command: >
+      apm-server -e
+        -E output.elasticsearch.hosts=["http://elasticsearch:9200"]
+        -E output.elasticsearch.username=elastic
+        -E output.elasticsearch.password=changeme
+        -E setup.kibana.host="kibana:5601"
+        -E apm-server.kibana.enabled=true
+        -E apm-server.kibana.host="kibana:5601"
+        -E apm-server.auth.api_key.enabled=true
+    ports:
+      - 8200:8200
+    networks:
+      - elastic
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: search-backend
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - ELASTIC_NODE=http://elasticsearch:9200
+      - ELASTIC_USERNAME=elastic
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-changeme}
+      - ELASTIC_TLS_REJECT_UNAUTHORIZED=false
+      - SETUP_INDICES=true
+      - SEED_DOCUMENTS=true
+      - APM_ACTIVE=${APM_ACTIVE:-false}
+      - APM_SERVICE_NAME=search-service
+      - APM_SERVER_URL=${APM_SERVER_URL:-http://apm-server:8200}
+      - APM_SECRET_TOKEN=${APM_SECRET_TOKEN:-}
+      - METRICS_JOB_ENABLED=true
+    ports:
+      - "4000:4000"
+    networks:
+      - elastic  
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: search-frontend
+    environment:
+      - NODE_ENV=production
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - elastic
+
+volumes:
+  esdata:
+
+networks:
+  elastic:
+    driver: bridge
