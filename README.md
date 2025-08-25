@@ -33,67 +33,41 @@ A criação do React com o VITE devido a agilidade na apresentação e apresenta
 - `backend/src/apm.ts` — inicialização do APM.
 
 ## Passo a passo (≤ 10 min)
-1) Instalar dependências
+## Implantação simplificada
 ```bash
-cd backend
-npm install
+chmod +x run.sh
+./run.sh
 ```
 
-2) Configurar variáveis de ambiente (`backend/.env`)
+## Implantação Manual
+1) Incluir Váriaveis de Ambiente
+# Varaveis de ambiente do projeto
+ELASTIC_PASSWORD="${ELASTIC_PASSWORD:-changeme}"
+KIBANA_URL="${KIBANA_URL:-http://localhost:5601}"
+ES_URL="${ES_URL:-http://localhost:9200}"
+APM_URL="${APM_URL:-http://localhost:8200}"
+BACKEND_URL="${BACKEND_URL:-http://localhost:4000}"
+FRONTEND_URL="${FRONTEND_URL:-http://localhost:5173}"
+
+2) Compilação dos projetos
 ```bash
-# App
-NODE_ENV=development
-PORT=4000
-
-# Conexão ES (escolha UMA estratégia)
-# 2.1) URL do node (local/docker)
-ELASTIC_NODE=https://localhost:9200
-ELASTIC_USERNAME=elastic
-ELASTIC_PASSWORD=changeme
-# 2.2) Elastic Cloud
-# ELASTIC_CLOUD_ID=...
-# ELASTIC_API_KEY=...
-
-# TLS (self-signed em dev)
-ELASTIC_TLS_REJECT_UNAUTHORIZED=false
-
-# APM (opcional)
-APM_ACTIVE=false
-APM_SERVICE_NAME=search-service
-APM_SERVER_URL=http://localhost:8200
-APM_SECRET_TOKEN=
-```
-Dica: com Docker local e certificado self-signed, mantenha `ELASTIC_TLS_REJECT_UNAUTHORIZED=false` apenas em dev.
-
-3) (Opcional) Subir ES local (sem segurança) — DEMO
-```bash
-docker run -p 9200:9200 -p 9300:9300 \
-  -e discovery.type=single-node \
-  -e xpack.security.enabled=false \
-  docker.elastic.co/elasticsearch/elasticsearch:8.15.3
-```
-
-4) Criar índices e mappings
-```bash
-npm run setup:indices
-```
-O script cria os índices `products`, `articles`, `events` com `dynamic:false`, analyzers PT/EN, multi-fields (text/en/ngram/keyword) e normalizer para keywords. Cria também `analytics-searches` e `analytics-clicks`.
-
-5) Popular com ~30 documentos
-```bash
-npm run seed
-```
-
-6) Rodar a API
-```bash
-npm run dev
-# ou
-npm run build && npm start
-```
-
-7) Verificar saúde
-```bash
-curl -s http://localhost:4000/health | jq
+#Backend
+docker compose build backend
+#frontend
+docker compose build frontend
+#Executando as stacks
+docker compose up -d
+#Executar a alteração de senha do Kibana, para que o user kibana_system funcione corretamente
+curl -s -u elastic:"$ELASTIC_PASSWORD" -X POST "$ES_URL/_security/user/kibana_system/_password" \
+	-H 'Content-Type: application/json' \
+	-d '{"password":"'"$ELASTIC_PASSWORD"'"}'
+#Criando os indices
+#O script cria os índices `products`, `articles`, `events` com `dynamic:false`, analyzers PT/EN, multi-fields (text/en/ngram/keyword) #e normalizer para keywords.
+docker compose exec -T backend node dist/es/setup.js
+#Criando os seeds
+docker compose exec -T backend node dist/es/seed.js
+#Atualizando as metricas
+docker compose exec -T backend node dist/cli/metrics.js
 ```
 
 ## API
@@ -105,7 +79,7 @@ Parâmetros
 - `size`: 1..100 (padrão 10)
 - `sort`: `relevance|recent|popular` (padrão `relevance`)
 
-Exemplos
+Exemplos de URLs
 ```bash
 curl -s "http://localhost:4000/api/search?q=node&type=all&page=1&size=10" | jq
 curl -s "http://localhost:4000/api/search?q=elasticsearch&sort=recent" | jq
@@ -121,19 +95,7 @@ Resposta (resumo)
   "query_id": "<uuid>"
 }
 ```
-Observação: toda busca é registrada em `analytics-searches` com `{ query_id, q, total, timestamp }`.
-
-### POST /api/analytics/click
-Body
-```json
-{ "query_id": "<uuid-da-busca>", "doc_id": "<_id>", "rank": 1, "timestamp": 1710000000000 }
-```
-Exemplo
-```bash
-curl -X POST http://localhost:4000/api/analytics/click \
-  -H 'Content-Type: application/json' \
-  -d '{"query_id":"<substitua>","doc_id":"<substitua>","rank":1}'
-```
+Observação: toda busca é registrada em `analiticos-buscas` com `{ query_id, q, total, timestamp }`.
 
 ### GET /api/metrics/kpis
 Retorna KPIs em 7 dias: `searches`, `clicks`, `ctr`, `zeroRate`, `avgPosition`.
@@ -153,36 +115,5 @@ curl -s http://localhost:4000/api/metrics/kpis | jq
 
 ## Métricas
 - Coleta
-  - Busca: `analytics-searches` com `{ query_id, q, total, timestamp }`.
-  - Clique: `analytics-clicks` com `{ query_id, doc_id, rank, timestamp }`.
-- Relatório CLI
-```bash
-npm run metrics
-```
-Mostra total de buscas, zero-results rate, CTR geral e CTR@1.
-
-## APM (opcional)
-- Ative com `APM_ACTIVE=true` no `.env` e configure `APM_SERVICE_NAME`, `APM_SERVER_URL`, `APM_SECRET_TOKEN`.
-- A inicialização acontece em `backend/src/apm.ts` e é importada em `backend/src/index.ts`.
-
-## Decisões técnicas
-- Modelo de relevância simples e transparente (texto + popularidade + recência).
-- `dynamic:false` para controle de schema e performance.
-- Analytics mínimos para indicadores essenciais (CTR, zero-results).
-- CLI de métricas simples para ser executada por qualquer desenvolvedor.
-
-## Próximos passos sugeridos
-- Autocomplete no frontend (usar `title.autocomplete`).
-- Sinônimos PT/EN em filtros customizados.
-- Dashboard React para CTR, Zero-Results, top queries e cliques.
-- Métricas avançadas: MRR, NDCG (requer rotulagem/julgamentos).
-- Explorar Learning to Rank conforme maturidade de dados.
-
-## Troubleshooting
-- Conexão ES: valide `ELASTIC_NODE`/`ELASTIC_CLOUD_ID` e credenciais.
-- Certificados: para self-signed em dev, `ELASTIC_TLS_REJECT_UNAUTHORIZED=false`.
-- Índices ausentes: rode `npm run setup:indices`.
-- Sem documentos: rode `npm run seed`.
-
----
-Qualquer dúvida, abra os arquivos citados neste README e execute os comandos de exemplo. Boa apresentação! 💪
+  - Busca: `analiticos-buscas` com `{ query_id, q, total, timestamp }`.
+  - Clique: `analiticos-cliques` com `{ query_id, doc_id, rank, timestamp }`.
