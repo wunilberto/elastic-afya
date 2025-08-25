@@ -1,0 +1,37 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"No tests yet\"",
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "setup:indices": "ts-node-dev --transpile-only src/es/setup.ts",
+    "seed": "ts-node-dev --transpile-only src/es/seed.ts",
+    "metrics": "ts-node-dev --transpile-only src/cli/metrics.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@elastic/elasticsearch": "^9.1.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "elastic-apm-node": "^4.13.0",
+    "express": "^5.1.0",
+    "pino": "^9.9.0",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.3.0",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.9.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
