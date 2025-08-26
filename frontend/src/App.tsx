@@ -153,20 +153,6 @@ function App() {
 				<button onClick={fetchSearch}>Buscar</button>
 			</div>
 
-			<div style={{ marginTop: 16 }}>
-				<label>Autocomplete (/suggest) com edge_ngram</label>
-				<input value={suggestQ} onChange={e => setSuggestQ(e.target.value)} placeholder="/api/autocomplete/suggest" />
-				{(sugs2.length > 0 && suggestQ) && (
-					<div style={{ border: '1px solid #ddd', borderRadius: 4, background: '#fff', position: 'absolute', zIndex: 10 }}>
-						{sugs2.map(s => (
-							<div key={s.id} style={{ padding: 8 }}>
-								<a href={s.url || '#'} target="_blank" rel="noreferrer">{s.title}</a>
-							</div>
-						))}
-					</div>
-				)}
-			</div>
-
 			<div style={{ display: 'grid', gap: 16, gridTemplateColumns: '1fr 1fr 1fr', marginTop: 24 }}>
 				<div>
 					<h3>Produtos</h3>
