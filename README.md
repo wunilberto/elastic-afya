@@ -32,7 +32,7 @@ A criação do React com o VITE devido a agilidade na apresentação e apresenta
 - `backend/src/es/client.ts` — cliente Elasticsearch (cloudId/node + auth).
 - `backend/src/apm.ts` — inicialização do APM.
 
-## Passo a passo (≤ 10 min)
+## Passo a passo
 ## Implantação simplificada
 ```bash
 chmod +x run.sh
@@ -117,3 +117,13 @@ curl -s http://localhost:4000/api/metrics/kpis | jq
 - Coleta
   - Busca: `analiticos-buscas` com `{ query_id, q, total, timestamp }`.
   - Clique: `analiticos-cliques` com `{ query_id, doc_id, rank, timestamp }`.
+
+# Extras realizados
+ - autocomplete
+ - dashboard React
+ - métricas avançadas (MRR, NDCG)
+ - Autocomplete (/suggest) com edge_ngram
+ - Mini-Dashboard React para métricas
+
+# Ídeias de Evolução
+ - Implementação completa da Observabilidade com o APM do Elastic
