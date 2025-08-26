@@ -33,6 +33,9 @@ function App() {
 	const [sugs, setSugs] = useState<Suggestion[]>([])
 	const [sugs2, setSugs2] = useState<Suggestion[]>([])
 	const [kpis, setKpis] = useState<Kpis | null>(null)
+	const [adv, setAdv] = useState<{ windowMinutes: number; k: number; totalSearches: number; queriesWithClicks: number; mrr: number; ndcg: number } | null>(null)
+	const [advMinutes, setAdvMinutes] = useState(10)
+	const [advK, setAdvK] = useState(10)
 	const dq = useDebounce(q, 200)
 	const dqs = useDebounce(suggestQ, 200)
 
@@ -66,6 +69,12 @@ function App() {
 		const data = await res.json()
 		setKpis(data)
 	}
+	async function fetchAdvanced() {
+		const params = new URLSearchParams({ minutes: String(advMinutes), k: String(advK) })
+		const res = await fetch(`${API_BASE}/api/metrics/advanced?${params.toString()}`)
+		const data = await res.json()
+		setAdv(data)
+	}
 
 	function trackClick(docId: string, rank: number) {
 		if (!queryId || !docId) return
@@ -90,13 +99,14 @@ function App() {
 		<div style={{ padding: 16, maxWidth: 1200, margin: '0 auto' }}>
 			<h2>Descrição do projeto</h2>
 			<p>
-				Este é um dashboard de busca que utiliza o Elasticsearch para realizar consultas e exibir resultados.
-				Ele inclui funcionalidades de autocomplete, métricas de busca e lista de produtos.
+				Este é um dashboard de busca que utiliza o Elasticsearch para realizar consultas e exibir resultados.<br/>
+				Ele inclui funcionalidades de autocomplete, métricas de busca e lista de produtos.<br/>
+				Também inclui métricas avançadas como MRR e NDCG.<br/>
 			</p>
 
 			<h2>Campo autocomplete</h2>
 				<div style={{ position: 'relative' }}>
-					<label>Query (products.title com autocomplete + sinônimos)</label><br/>
+					<label>Query (products.title com autocomplete)</label><br/>
 					<input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar em products.title" onKeyDown={e => { if (e.key === 'Enter') fetchSearch() }} />
 					{(sugs.length > 0 && q) && (
 						<div style={{ border: '1px solid #ddd', borderRadius: 4, background: '#fff', position: 'absolute', zIndex: 10 }}>
@@ -111,7 +121,7 @@ function App() {
 
 			<h2>Autocomplete (/suggest) com edge_ngram</h2>
 				<div style={{ marginTop: 16 }}>
-					<label>Campos</label>
+					<label></label>
 					<input value={suggestQ} onChange={e => setSuggestQ(e.target.value)} placeholder="/api/autocomplete/suggest" />
 					{(sugs2.length > 0 && suggestQ) && (
 						<div style={{ border: '1px solid #ddd', borderRadius: 4, background: '#fff', position: 'absolute', zIndex: 10 }}>
@@ -123,8 +133,6 @@ function App() {
 						</div>
 					)}
 				</div>
-
-
 
 			<h2>Busca dinamica nos index (Products, Articles, Events)</h2>
 
@@ -221,6 +229,32 @@ function App() {
 			</table>
 		</div>
 
+		<div style={{ marginTop: 24, padding: 12, border: '1px solid #eee', borderRadius: 6 }}>
+				<h3>Métricas Avançadas (MRR / NDCG)</h3>
+				<div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 8 }}>
+					<label>
+						Minutos:
+						<input type="number" min={1} max={1440} value={advMinutes} onChange={e => setAdvMinutes(Number(e.target.value))} style={{ marginLeft: 6, width: 80 }} />
+					</label>
+					<label>
+						k:
+						<input type="number" min={1} max={100} value={advK} onChange={e => setAdvK(Number(e.target.value))} style={{ marginLeft: 6, width: 80 }} />
+					</label>
+					<button onClick={fetchAdvanced}>Atualizar</button>
+				</div>
+				{adv && (
+					<table style={{ borderCollapse: 'collapse', fontSize: 14 }}>
+						<tbody>
+							<tr><td style={{ border: '1px solid #ddd', padding: 6 }}>Janela (min)</td><td style={{ border: '1px solid #ddd', padding: 6 }}>{adv.windowMinutes}</td></tr>
+							<tr><td style={{ border: '1px solid #ddd', padding: 6 }}>k</td><td style={{ border: '1px solid #ddd', padding: 6 }}>{adv.k}</td></tr>
+							<tr><td style={{ border: '1px solid #ddd', padding: 6 }}>Total de Buscas</td><td style={{ border: '1px solid #ddd', padding: 6 }}>{adv.totalSearches}</td></tr>
+							<tr><td style={{ border: '1px solid #ddd', padding: 6 }}>Consultas com Clique</td><td style={{ border: '1px solid #ddd', padding: 6 }}>{adv.queriesWithClicks}</td></tr>
+							<tr><td style={{ border: '1px solid #ddd', padding: 6 }}>MRR</td><td style={{ border: '1px solid #ddd', padding: 6 }}>{adv.mrr.toFixed(4)}</td></tr>
+							<tr><td style={{ border: '1px solid #ddd', padding: 6 }}>NDCG@k</td><td style={{ border: '1px solid #ddd', padding: 6 }}>{adv.ndcg.toFixed(4)}</td></tr>
+						</tbody>
+					</table>
+				)}
+			</div>
 
 		<div style={{ marginTop: 40 }}>
 			<h3>Métricas de Busca</h3>

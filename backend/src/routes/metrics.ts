@@ -78,13 +78,69 @@ metricsRouter.get("/kpis", async (req, res) => {
 
 // Advanced metrics placeholder (MRR/NDCG approximations)
 metricsRouter.get("/advanced", async (req, res) => {
-  // This endpoint provides placeholders. Real MRR/NDCG need labeled relevance.
-  const result = {
-    mrr: null, // requires judgments
-    ndcg: null, // requires graded relevance
-    note: "Provide labeled relevance to compute true MRR/NDCG",
-  };
-  res.json(result);
+  const minutes = Number((req.query.minutes as string) || 10);
+  const k = Math.max(1, Number((req.query.k as string) || 10));
+  const now = Date.now();
+  const start = now - minutes * 60 * 1000;
+
+  const searchesAgg = await esClient.search({
+    index: "analiticos-buscas",
+    size: 0,
+    query: { range: { carimbo_tempo: { gte: start, lte: now } } },
+    aggs: {
+      total_searches: { value_count: { field: "id_consulta" } },
+    },
+  } as any);
+
+  const clicksAgg = await esClient.search({
+    index: "analiticos-cliques",
+    size: 0,
+    query: { range: { carimbo_tempo: { gte: start, lte: now } } },
+    aggs: {
+      by_query: {
+        terms: { field: "id_consulta", size: 10000 },
+        aggs: {
+          positions: { top_hits: { size: 100, sort: [{ posicao: "asc" }], _source: { includes: ["posicao"] } } },
+          min_pos: { min: { field: "posicao" } },
+        },
+      },
+    },
+  } as any);
+
+  const totalSearches: number = (searchesAgg.aggregations as any)?.total_searches?.value ?? 0;
+
+  const buckets: any[] = (clicksAgg.aggregations as any)?.by_query?.buckets ?? [];
+  let mrrSum = 0;
+  let ndcgSum = 0;
+  let queriesWithClicks = 0;
+
+  for (const b of buckets) {
+    const minPos: number | null = b.min_pos?.value ?? null;
+    // positions clicked for this query
+    const hits: any[] = b.positions?.hits?.hits ?? [];
+    const posList: number[] = hits.map((h: any) => Number(h._source.posicao)).filter((p: any) => Number.isFinite(p));
+    const posWithinK = posList.filter((p) => p >= 1 && p <= k);
+
+    if (minPos && Number.isFinite(minPos)) {
+      mrrSum += 1 / minPos;
+    }
+
+    if (posWithinK.length > 0) {
+      // DCG from clicked positions (binary gains)
+      const dcg = posWithinK.reduce((acc, p) => acc + 1 / Math.log2(1 + p), 0);
+      // Ideal DCG for m clicks is clicks at ranks 1..m
+      const m = posWithinK.length;
+      const idcg = Array.from({ length: Math.min(m, k) }, (_, i) => 1 / Math.log2(2 + i)).reduce((a, b) => a + b, 0);
+      const ndcg = idcg > 0 ? dcg / idcg : 0;
+      ndcgSum += ndcg;
+      queriesWithClicks += 1;
+    }
+  }
+
+  const mrr = buckets.length > 0 ? mrrSum / buckets.length : 0;
+  const ndcg = queriesWithClicks > 0 ? ndcgSum / queriesWithClicks : 0;
+
+  res.json({ windowMinutes: minutes, k, totalSearches, queriesWithClicks, mrr, ndcg });
 });
 
 // Latest metrics snapshot from analytics-metrics index
