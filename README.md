@@ -11,7 +11,7 @@
 # Search Service (Node.js + Elasticsearch 8)
 Criando o Backend em node.Js que é a stack que informado no roteiro e que nos ultimos anos é a que tenho mais desenvolvido projetos
 
-O Elasticsearch já tenho familiaridade devido ao tempo de trabalho com essa stack, não só em integração com o sistema mais na manutenabilidade em servidores AWS e on-primesse.
+O Elasticsearch tenho familiaridade devido ao tempo de trabalho com essa stack, não só em integração com o sistema mais na manutenabilidade em servidores AWS e on-primesse.
 
 A criação do React com o VITE devido a agilidade na apresentação e apresentação dos dados de uma forma mais simples.
 
@@ -99,6 +99,9 @@ Observação: toda busca é registrada em `analiticos-buscas` com `{ query_id, q
 
 ### GET /api/metrics/kpis
 Retorna KPIs em 7 dias: `searches`, `clicks`, `ctr`, `zeroRate`, `avgPosition`.
+
+OBS.:Para realizar a contabilização de cliques, tem que clicar nos links da lista ou da tabela de produtos.
+
 ```bash
 curl -s http://localhost:4000/api/metrics/kpis | jq
 ```
